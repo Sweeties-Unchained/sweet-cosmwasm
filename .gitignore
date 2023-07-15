@@ -14,3 +14,6 @@
 # IDEs
 *.iml
 .idea
+
+IGNORE*
+Z_IGNORE*
