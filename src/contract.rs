@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Empty};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Empty, BankQuery};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -20,7 +20,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
-        liveStatus: if msg.live { LiveStatus::Alive } else { LiveStatus::default() },
+        live_status: if msg.live { LiveStatus::Alive } else { LiveStatus::default() },
         group_type: msg.group_type,
         expiry: Expiry::default(),
         recovery: RecoveryInfo::default(),
@@ -86,7 +86,7 @@ pub fn execute(
 // QUERY stuff
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         // EXAMPLE: QueryMsg::GetCountType {} => to_binary(&query::count(deps)?),
         QueryMsg::GetLiveStatus {} => to_binary(&query::get_live_status(deps)?),
@@ -96,14 +96,16 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetExpiry {} => to_binary(&query::get_expiry(deps)?),
         QueryMsg::GetRecoveryInfo {} => to_binary(&query::get_recovery_info(deps)?),
         QueryMsg::GetVersionInfo {} => to_binary(&query::get_version_info(deps)?),
-        QueryMsg::GetBalances {} => to_binary(&query::get_balances(deps)?),
+        QueryMsg::GetBalances {} => to_binary(&query::get_balances(deps, env)?),
 
     }
 }
 
 // query handlers
 pub mod query {
-    use crate::msg::{GetLiveStatusResponse, GetMembersResponse, GetRulesResponse, GetExpiryResponse, GetRecoveryInfoResponse, GetVersionInfoResponse};
+    use cosmwasm_std::QueryRequest;
+
+    use crate::msg::{GetLiveStatusResponse, GetMembersResponse, GetRulesResponse, GetExpiryResponse, GetRecoveryInfoResponse, GetVersionInfoResponse, GetBalancesResponse};
 
     use super::*;
 
@@ -115,7 +117,7 @@ pub mod query {
     
     pub fn get_live_status(deps: Deps) -> StdResult<GetLiveStatusResponse> {
         let state = STATE.load(deps.storage)?;
-        Ok(GetLiveStatusResponse { live_status: state.liveStatus })
+        Ok(GetLiveStatusResponse { live_status: state.live_status })
     }
 
     pub fn get_group_type(deps: Deps) -> StdResult<GetGroupTypeResponse> {
@@ -152,10 +154,14 @@ pub mod query {
         Ok(GetVersionInfoResponse { version_info: state.version })
     }
 
-    pub fn get_balances(deps: Deps) -> StdResult<GetBalancesResponse> {
-        // let state = STATE.load(deps.storage)?;
-        todo!(); //Z!
-        Ok(GetBalancesResponse {  })
+    pub fn get_balances(deps: Deps, env: Env) -> StdResult<GetBalancesResponse> {
+        /* deps.querier.query(&cosmwasm_std::QueryRequest::Bank(
+            BankQuery::Balance {
+                address: env.contract.address,
+                denom: todo!(),
+            }
+        ))? */
+        todo!()
     }
 
 }
@@ -204,7 +210,7 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut deps = mock_dependencies();
+        /* let mut deps = mock_dependencies();
 
         let msg = todo!(); //InstantiateMsg { count: 17 };
         let info = mock_info("creator", &coins(2, "token"));
@@ -226,7 +232,7 @@ mod tests {
 
         // should now be 5
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetGroupType {}).unwrap();
-        let value: GetGroupTypeResponse = from_binary(&res).unwrap();
+        let value: GetGroupTypeResponse = from_binary(&res).unwrap(); */
         assert_eq!(5, 4);
     }
 }

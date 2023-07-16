@@ -1,9 +1,10 @@
 use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Empty, Coin};
-use cw_multi_test::Contract;
+// use cw_multi_test::Contract; //WTF?
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetGroupTypeResponse, InstantiateMsg, QueryMsg, ControllerMsg, MemberMsg};
 use crate::state::*;
 
+const TRUE_FOR_NOW: bool = true;
 /* 
 example:
 pub mod executors {
@@ -33,10 +34,14 @@ pub fn reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, C
 
 
 pub fn check_credentials(senderType: Sender, cred: Credential) -> Result<Response, ContractError> {
-  match senderType {
-    Sender::Controller => todo!(),
-    Sender::Member(idx) => todo!()
-  }
+  
+  let res = match (TRUE_FOR_NOW, senderType) {
+    (true, _) => Response::new().add_attribute("dummy credential check", "dummy true"),
+    (_, Sender::Controller) => todo!(),
+    (_, Sender::Member(idx)) => todo!(),
+  };
+
+  Ok(res)
 }
 
 pub fn controller_msg_handler(deps: DepsMut, _env: Env, info: MessageInfo, control_msg: ControllerMsg) -> Result<Response, ContractError> {
@@ -47,6 +52,8 @@ pub fn controller_msg_handler(deps: DepsMut, _env: Env, info: MessageInfo, contr
     ControllerMsg::RemoveMember { m_idx } => remove_member(m_idx, deps)?,
     ControllerMsg::AddRule { rule } => add_rule(rule, deps)?,
     ControllerMsg::RemoveRule { rule_idx } => remove_rule(rule_idx, deps)?,
+    ControllerMsg::ReplaceCredential { new_credential } => replace_credential(new_credential, deps)?,
+    ControllerMsg::Update { live_status, group_type, expiry, recovery, credential, version } => update( live_status, group_type, expiry, recovery, credential, version, deps)?,
     // _ => todo!()
   };
   Ok(res)
@@ -55,7 +62,7 @@ pub fn controller_msg_handler(deps: DepsMut, _env: Env, info: MessageInfo, contr
 pub fn member_msg_handler(deps: DepsMut, _env: Env, info: MessageInfo, m_idx: mapIndexType, member_msg: MemberMsg) -> Result<Response, ContractError> {
   let res: Response = match (m_idx, member_msg) {
     (_, MemberMsg::Test {}) => Response::new().add_attribute("test member msg", "ok!"),
-    (m_idx, MemberMsg::ReplaceCredential { new_credential }) => replace_credential(m_idx, new_credential, deps)?,
+    (m_idx, MemberMsg::ReplaceCredential { new_credential }) => replace_members_credential(m_idx, new_credential, deps)?,
     (m_idx, MemberMsg::Spend { payment }) => spend(m_idx, payment, deps)?,
     (m_idx, MemberMsg::PayIn { coins }) => pay_in(m_idx, coins, deps)?,
 
@@ -67,11 +74,11 @@ pub fn member_msg_handler(deps: DepsMut, _env: Env, info: MessageInfo, m_idx: ma
 // the actual handlers
 pub fn set_live_status(new_live_status: LiveStatus, deps: DepsMut) -> Result<Response, ContractError> {
   STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-      state.liveStatus = new_live_status;
+      state.live_status = new_live_status;
       Ok(state)
   })?;
 
-  Ok(Response::new().add_attribute("action", "increment"))
+  Ok(Response::new().add_attribute("controller action", "set live status"))
 }
 /* pub fn leave(deps: DepsMut, info: MessageInfo) -> StdResult<Response> {
   ADMINS.update(deps.storage, move |admins| -> StdResult<_> {
@@ -86,7 +93,7 @@ pub fn set_live_status(new_live_status: LiveStatus, deps: DepsMut) -> Result<Res
 }*/
 
 pub fn add_member(credential: Credential, deps: DepsMut) -> Result<Response, ContractError> {
-  let m_idx = todo!() // where is new idx from?
+  let m_idx = todo!(); // where is new idx from?
   MEMBERS.save(deps.storage, m_idx, &Member::new(credential))?;
 }
 
@@ -113,6 +120,39 @@ pub fn remove_rule(rule_idx: mapIndexType, deps: DepsMut) -> Result<Response, Co
 
   Ok(res)
 }
+
+pub fn replace_credential(new_credential: Credential, deps: DepsMut) -> Result<Response, ContractError> {
+  STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+    state.credential = new_credential;
+    Ok(state)
+  })?;
+
+  Ok(Response::new().add_attribute("controller action", "replace credential"))
+}
+
+/* pub struct State {
+  pub live_status: LiveStatus,
+  pub group_type: GroupType,
+  // group_members: TYPE_TODO,
+  // group_rules: TYPE_TODO,
+  pub expiry: Expiry,
+  pub recovery: RecoveryInfo,
+  pub credential: Credential,
+  pub version: VersionInfo
+} */
+
+pub fn update(live_status: LiveStatus, group_type: GroupType, expiry: Expiry, recovery: RecoveryInfo, credential: Credential, version: VersionInfo, deps: DepsMut) -> Result<Response, ContractError> { 
+  let res = STATE.save(deps.storage, &State {
+    live_status,
+    group_type,
+    expiry,
+    recovery,
+    credential,
+    version,
+  }); //TO DO: add attributes
+    
+  Ok(Response::new().add_attribute("controller action", "general state update"))
+}
 /* pub fn leave(deps: DepsMut, info: MessageInfo) -> StdResult<Response> {
   ADMINS.update(deps.storage, move |admins| -> StdResult<_> {
       let admins = admins
@@ -127,7 +167,7 @@ pub fn remove_rule(rule_idx: mapIndexType, deps: DepsMut) -> Result<Response, Co
 
 // MEMBERS
 
-pub fn replace_credential(m_idx: mapIndexType, new_credential: Credential, deps: DepsMut) -> Result<Response, ContractError> {
+pub fn replace_members_credential(m_idx: mapIndexType, new_credential: Credential, deps: DepsMut) -> Result<Response, ContractError> {
   MEMBERS.update(deps.storage, m_idx, |mut opt_member| -> Result<_, ContractError> {
       if let Some(mut member) = opt_member {
         member.set_credential(new_credential)?;
@@ -141,7 +181,9 @@ pub fn replace_credential(m_idx: mapIndexType, new_credential: Credential, deps:
 
 pub fn spend(m_idx: mapIndexType, payment: Payment, deps: DepsMut) -> Result<Response, ContractError> {
   let member = MEMBERS.load(deps.storage, m_idx)?;
-  let payment_check = member.check_payment_allowed(payment)?;
+  let rules: Vec<Rule> = vec![];  // TO DO: real logic
+
+  let payment_check = member.check_payment_allowed(payment.clone(), rules)?;
   let res: Response = match payment_check {
     PaymentStatus::OK => {
        let res: Response = make_payment(payment)?;

@@ -13,7 +13,7 @@ type TYPE_TODO = bool;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct State {
-    pub liveStatus: LiveStatus,
+    pub live_status: LiveStatus,
     pub group_type: GroupType,
     // group_members: TYPE_TODO,
     // group_rules: TYPE_TODO,
@@ -133,7 +133,7 @@ impl Member {
         Ok(Response::new())
     }
     
-    pub fn check_payment_allowed(&self, payment: Payment) -> Result<PaymentStatus, ContractError> {
+    pub fn check_payment_allowed(&self, payment: Payment, rules: Vec<Rule>) -> Result<PaymentStatus, ContractError> {
         todo!()
     }
 }
@@ -154,12 +154,20 @@ impl Default for Rule {
 }
 
 impl fmt::Display for Rule {
+    
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let rule_str = match self {
             NO_RULE_DEFINED => "NO RULE DEFINED",
         };
         write!(f, "{rule_str}")
     }
+}
+
+impl Rule {
+    pub fn new(rule: Rule) -> Self{
+        rule
+    }
+
 }
 
 // OTHER TYPES

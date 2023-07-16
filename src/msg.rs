@@ -44,7 +44,7 @@ pub enum ControllerMsg {
     RemoveMember { m_idx: mapIndexType },
     AddRule { rule: Rule },
     RemoveRule { rule_idx: mapIndexType},
-    ReplaceCredential {  oldCredential: Credential, newCredential: Credential },
+    ReplaceCredential {  new_credential: Credential },
     Test {},
 }
 
