@@ -1,8 +1,12 @@
+use std::{collections::HashMap, fmt};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Timestamp};
+use cosmwasm_std::{Addr, Timestamp, Coin, Response};
 use cw_storage_plus::{Map, Item};
+
+use crate::ContractError;
 
 type TYPE_TODO = bool;
 
@@ -18,15 +22,28 @@ pub struct State {
     pub credential: Credential,
     pub version: VersionInfo
 }
-pub type mapIndex_u8 = u8;
+pub type mapIndexType = u8; // Note: can't use usize due to weird floating point issue
 pub const STATE: Item<State> = Item::new("state");
-pub const MEMBERS: Map<mapIndex_u8, Member> = Map::new("members");
-pub const RULES: Map<mapIndex_u8, Rule> = Map::new("rules");
+pub const MEMBERS: Map<mapIndexType, Member> = Map::new("members");
+pub const RULES: Map<mapIndexType, Rule> = Map::new("rules");
 
 // pub const MEMBERS: Item<Vec<Member>> = Item::new("members");
 // pub const RULES: Item<Vec<Rule>> = Item::new("rules");
 
 //dependent types:
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum Sender {
+    Controller,
+    Member(mapIndexType)
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct Payment {
+    toAddr: Addr,
+    amount: HashMap::<u8, Coin>, // Z! HMMMM... Vec<Coin>, but serialises...? HOW DO I SOLVE THIS?
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum LiveStatus {   // may be other states in future
     Dormant,
@@ -43,17 +60,25 @@ impl Default for LiveStatus {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum GroupType {
-    TODO_ENUM,
+    Simple,
 }
+
+impl Default for GroupType {
+    fn default() -> Self {
+        GroupType::Simple
+    }
+}
+
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum RecoveryInfo {
-    NO_RECOVERY_IMPLEMENTED,
+    NOT_IMPLEMENTED_YET,
 }
 
 impl Default for RecoveryInfo {
     fn default() -> Self {
-        RecoveryInfo::NO_RECOVERY_IMPLEMENTED
+        RecoveryInfo::NOT_IMPLEMENTED_YET
     }
 }
 
@@ -82,27 +107,72 @@ impl Default for VersionInfo {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum Credential {
-    NO_CREDENTIAL_DEFINED,
+    CREDENTIAL_TO_BE_DEFINED,
 }
 
 impl Default for Credential {
     fn default() -> Self {
-        Credential::NO_CREDENTIAL_DEFINED
+        Credential::CREDENTIAL_TO_BE_DEFINED
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub enum Member {
-    TODO_ENUM,
+pub struct Member {
+    credential: Credential, 
 }
+
+impl Member {
+    pub fn new(credential: Credential) -> Self {
+        Self {
+            credential
+        }
+    }
+
+    pub fn set_credential(&mut self, new_credential: Credential) -> Result<Response, ContractError> {
+        self.credential = new_credential;
+        Ok(Response::new())
+    }
+    
+    pub fn check_payment_allowed(&self, payment: Payment) -> Result<PaymentStatus, ContractError> {
+        todo!()
+    }
+}
+
+pub type DenomString = String;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum Rule {
-    NO_RULE_DEFINED,
+    Limit{ coinLimits: Vec<SpendingLimit>  },
+    LimitLess,  // !
+    Undefined,
 }
 
 impl Default for Rule {
     fn default() -> Self {
-        Rule::NO_RULE_DEFINED
+        Rule::Undefined
     }
+}
+
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let rule_str = match self {
+            NO_RULE_DEFINED => "NO RULE DEFINED",
+        };
+        write!(f, "{rule_str}")
+    }
+}
+
+// OTHER TYPES
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum PaymentStatus {
+    OK,
+    NeedsConfirmation,
+    Rejected,
+}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+
+pub struct SpendingLimit {
+    denom: DenomString,
+    amount: u128,
+    period_in_days: u32,
 }

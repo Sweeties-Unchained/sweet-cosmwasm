@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use cw_storage_plus::{Map};
-use cosmwasm_std::{Timestamp};
+use cosmwasm_std::{Timestamp, Coin};
 
 use crate::state::*;
 
@@ -20,11 +22,49 @@ pub struct InstantiateMsg {
     pub rules: Vec<Rule>
 }
 
+// Execution
 #[cw_serde]
 pub enum ExecuteMsg {
-    Increment {},
-    Reset { count: i32 },
+    ControlMsg { control_msg: ControllerMsg, credential: Credential },  // messages from the "controller" (set up and edit app)
+    MemberMsg { member_msg: MemberMsg, idx: mapIndexType, credential: Credential }, // messages from a user
 }
+
+#[cw_serde]
+pub enum ControllerMsg {
+    SetLiveStatus { live_status: LiveStatus },
+    Update { 
+        live_status: LiveStatus,
+        group_type: GroupType,
+        expiry: Expiry,
+        recovery: RecoveryInfo,
+        credential: Credential,
+        version: VersionInfo,
+    },
+    AddMember { member: Member, credential: Credential },
+    RemoveMember { m_idx: mapIndexType },
+    AddRule { rule: Rule },
+    RemoveRule { rule_idx: mapIndexType},
+    ReplaceCredential {  oldCredential: Credential, newCredential: Credential },
+    Test {},
+}
+
+#[cw_serde]
+pub enum MemberMsg {
+    Spend { payment: Payment },
+    PayIn { coins: Vec<Coin> },   //TODO?
+    ReplaceCredential { new_credential: Credential },
+    // Propose { proposition: Proposition },  // not implemented!
+    // Accept { proposition: Proposition },  // not implemented!
+    // Sign { proposition: Proposition }, ,  // not implemented!
+    // Reject { proposition: Proposition },   // not implemented!
+    // Cancel { proposition: Proposition },   // not implemented!
+
+
+    Test {}
+}
+
+
+//Queries
 
 #[cw_serde]
 #[derive(QueryResponses)]
@@ -44,6 +84,11 @@ pub enum QueryMsg {
     GetRecoveryInfo {},
     #[returns(GetVersionInfoResponse)]
     GetVersionInfo {},
+
+    //other
+    #[returns(GetBalancesResponse)]
+    GetBalances {},
+
 }
 
 // We define a custom struct for each query response
@@ -59,12 +104,12 @@ pub struct GetGroupTypeResponse {
 
 #[cw_serde]
 pub struct GetMembersResponse {
-    pub members: Vec<(mapIndex_u8, Member)>,    // hmmm.... !
+    pub members: Vec<(mapIndexType, Member)>,    // hmmm.... !
 }
 
 #[cw_serde]
 pub struct GetRulesResponse {
-    pub rules: Vec<(mapIndex_u8, Rule)>,
+    pub rules: Vec<(mapIndexType, Rule)>,
 }
 
 #[cw_serde]
@@ -80,6 +125,11 @@ pub struct GetRecoveryInfoResponse {
 #[cw_serde]
 pub struct GetVersionInfoResponse {
     pub version_info: VersionInfo,
+}
+
+#[cw_serde]
+pub struct GetBalancesResponse {
+    pub balances: HashMap<mapIndexType, Coin>, //hmm..?
 }
 
 /* #[cw_serde]

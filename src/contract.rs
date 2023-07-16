@@ -4,8 +4,9 @@ use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetGroupTypeResponse, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, GetGroupTypeResponse, InstantiateMsg, QueryMsg, ControllerMsg};
 use crate::state::*;
+use crate::executors as execute;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:sweet-cosmwasm";
@@ -37,12 +38,12 @@ pub fn instantiate(
     
     for (idx, member) in msg.members.into_iter().enumerate() {
         // example: ADMINS.save(deps.storage, &admin, &env.block.time)?;
-        // ! : production should check size is acceptable
-        MEMBERS.save(deps.storage, idx as mapIndex_u8, &member)?;
+        // ! : production should check that size (mapIndexType) is acceptable
+        MEMBERS.save(deps.storage, idx as mapIndexType, &member)?;
     }
     for (idx, rule) in msg.rules.into_iter().enumerate() {
-        // ! : production should check size is acceptable
-        RULES.save(deps.storage, idx as mapIndex_u8, &rule)?;
+        // ! : production should check that size (mapIndexType) is acceptable
+        RULES.save(deps.storage, idx as mapIndexType, &rule)?;
     }
 
     Ok(Response::new()
@@ -64,35 +65,25 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
+    /* example:
     match msg {
         ExecuteMsg::Increment {} => execute::increment(deps),
         ExecuteMsg::Reset { count } => execute::reset(deps, info, count),
+    } */
+
+    match msg {
+        ExecuteMsg::ControlMsg { control_msg, credential } => {
+            execute::check_credentials(Sender::Controller, credential)?;
+            execute::controller_msg_handler(deps, _env, info, control_msg)
+        },
+        ExecuteMsg::MemberMsg{ member_msg, idx, credential }  => {
+            execute::check_credentials(Sender::Member(idx), credential)?;
+            execute::member_msg_handler(deps, _env, info, idx, member_msg)
+        },
     }
 }
 
-pub mod execute {
-    use super::*;
-
-    pub fn increment(deps: DepsMut) -> Result<Response, ContractError> {
-        STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-            state.count += 1;
-            Ok(state)
-        })?;
-
-        Ok(Response::new().add_attribute("action", "increment"))
-    }
-
-    pub fn reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-        STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-            if info.sender != state.owner {
-                return Err(ContractError::Unauthorized {});
-            }
-            state.count = count;
-            Ok(state)
-        })?;
-        Ok(Response::new().add_attribute("action", "reset"))
-    }
-}
+// QUERY stuff
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -105,6 +96,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetExpiry {} => to_binary(&query::get_expiry(deps)?),
         QueryMsg::GetRecoveryInfo {} => to_binary(&query::get_recovery_info(deps)?),
         QueryMsg::GetVersionInfo {} => to_binary(&query::get_version_info(deps)?),
+        QueryMsg::GetBalances {} => to_binary(&query::get_balances(deps)?),
 
     }
 }
@@ -160,6 +152,12 @@ pub mod query {
         Ok(GetVersionInfoResponse { version_info: state.version })
     }
 
+    pub fn get_balances(deps: Deps) -> StdResult<GetBalancesResponse> {
+        // let state = STATE.load(deps.storage)?;
+        todo!(); //Z!
+        Ok(GetBalancesResponse {  })
+    }
+
 }
 
 #[cfg(test)]
@@ -195,7 +193,7 @@ mod tests {
 
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
+        let msg = ExecuteMsg::MemberMsg { member_msg: crate::msg::MemberMsg::Test {  }, idx: 0u8, credential: Credential::CREDENTIAL_TO_BE_DEFINED }; //ExecuteMsg::Increment {};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // should increase counter by 1
